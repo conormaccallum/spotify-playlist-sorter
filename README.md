@@ -18,12 +18,38 @@ npm run dev
 
 Then open `http://localhost:3000`.
 
+For shared state, create `.env.local` with:
+
+```bash
+KV_REST_API_URL=...
+KV_REST_API_TOKEN=...
+SPOTIFY_CLIENT_ID=...
+SPOTIFY_CLIENT_SECRET=...
+```
+
 ## Verify
 
 ```bash
 npm run build
 npm test
 ```
+
+## Vercel hosting
+
+1. Push this repository to GitHub.
+2. In Vercel, choose **Add New → Project** and import the GitHub repo.
+3. In the project’s **Storage** tab, add **Redis**.
+4. Make sure the Redis integration exposes these environment variables to the project:
+   - `KV_REST_API_URL`
+   - `KV_REST_API_TOKEN`
+5. Add the Spotify variables in **Settings → Environment Variables**:
+   - `SPOTIFY_CLIENT_ID`
+   - `SPOTIFY_CLIENT_SECRET`
+6. Deploy with the defaults:
+   - Framework preset: Next.js
+   - Build command: `npm run build`
+   - Install command: `npm install`
+   - Output directory: leave blank
 
 ## Spotify import
 

@@ -18,9 +18,9 @@ test("playlist sorter source replaces the starter shell", async () => {
 });
 
 test("build output includes the app routes", async () => {
-  const worker = await readFile(new URL("../dist/server/index.js", import.meta.url), "utf8");
+  const manifest = await readFile(new URL("../.next/server/app-paths-manifest.json", import.meta.url), "utf8");
 
-  assert.match(worker, /api\/import/);
-  assert.match(worker, /api\/room/);
-  assert.match(worker, /api\/tracks\/category/);
+  assert.match(manifest, /api\/import/);
+  assert.match(manifest, /api\/room/);
+  assert.match(manifest, /api\/tracks\/category/);
 });

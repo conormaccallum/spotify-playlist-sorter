@@ -1,5 +1,11 @@
-import { env } from "cloudflare:workers";
-import { ensureSchema, getD1, jsonError, parsePlaylistId, slugify } from "../_lib";
+import {
+  jsonError,
+  nowIso,
+  parsePlaylistId,
+  saveRoomWithTracks,
+  slugify,
+  type StoredTrack,
+} from "../_lib";
 
 type SpotifyTrack = {
   id: string;
@@ -14,8 +20,8 @@ type SpotifyTrack = {
 };
 
 async function getSpotifyToken() {
-  const clientId = env.SPOTIFY_CLIENT_ID;
-  const clientSecret = env.SPOTIFY_CLIENT_SECRET;
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
     throw new Error(
       "Spotify import needs SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET. Until those are set, use the paste-a-track-list fallback."
@@ -125,7 +131,6 @@ function parseManualTracks(raw: string) {
 
 export async function POST(request: Request) {
   try {
-    await ensureSchema();
     const body = (await request.json()) as {
       playlistUrl?: string;
       manualTracks?: string;
@@ -147,41 +152,35 @@ export async function POST(request: Request) {
     if (!imported.tracks.length) return jsonError(new Error("No tracks were found to import."), 400);
 
     const roomId = imported.id === "manual" ? slugify(imported.name) : slugify(imported.id);
-    const db = getD1();
+    const timestamp = nowIso();
+    const tracks: StoredTrack[] = imported.tracks.map((track) => ({
+      id: `${roomId}-${track.id}`,
+      spotifyTrackId: track.spotifyTrackId,
+      uri: track.uri,
+      name: track.name,
+      artists: track.artists,
+      album: track.album,
+      imageUrl: track.imageUrl,
+      durationMs: track.durationMs,
+      position: track.position,
+      category: null,
+      sortedBy: "",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }));
 
-    await db
-      .prepare(
-        "INSERT INTO rooms (id, name, description, image_url, external_url, spotify_playlist_id, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name = excluded.name, description = excluded.description, image_url = excluded.image_url, external_url = excluded.external_url, spotify_playlist_id = excluded.spotify_playlist_id, updated_at = CURRENT_TIMESTAMP"
-      )
-      .bind(
-        roomId,
-        imported.name,
-        imported.description,
-        imported.imageUrl,
-        imported.externalUrl,
-        imported.id === "manual" ? "" : imported.id
-      )
-      .run();
-
-    await db.batch(
-      imported.tracks.map((track) =>
-        db
-          .prepare(
-            "INSERT INTO tracks (id, room_id, spotify_track_id, uri, name, artists, album, image_url, duration_ms, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, artists = excluded.artists, album = excluded.album, image_url = excluded.image_url, duration_ms = excluded.duration_ms, position = excluded.position, updated_at = CURRENT_TIMESTAMP"
-          )
-          .bind(
-            `${roomId}-${track.id}`,
-            roomId,
-            track.spotifyTrackId,
-            track.uri,
-            track.name,
-            track.artists,
-            track.album,
-            track.imageUrl,
-            track.durationMs,
-            track.position
-          )
-      )
+    await saveRoomWithTracks(
+      {
+        id: roomId,
+        name: imported.name,
+        description: imported.description,
+        imageUrl: imported.imageUrl,
+        externalUrl: imported.externalUrl,
+        spotifyPlaylistId: imported.id === "manual" ? "" : imported.id,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      tracks
     );
 
     return Response.json({

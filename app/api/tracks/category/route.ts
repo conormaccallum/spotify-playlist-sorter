@@ -1,8 +1,7 @@
-import { categories, ensureSchema, getD1, jsonError } from "../../_lib";
+import { categories, jsonError, updateTrackCategory } from "../../_lib";
 
 export async function POST(request: Request) {
   try {
-    await ensureSchema();
     const body = (await request.json()) as {
       roomId?: string;
       trackId?: string;
@@ -20,17 +19,7 @@ export async function POST(request: Request) {
       return jsonError(new Error("Unknown category."), 400);
     }
 
-    const db = getD1();
-    const result = await db
-      .prepare(
-        "UPDATE tracks SET category = ?, sorted_by = ?, updated_at = CURRENT_TIMESTAMP WHERE room_id = ? AND id = ? RETURNING id, category, sorted_by, updated_at"
-      )
-      .bind(category, sortedBy, roomId, trackId)
-      .first();
-
-    if (!result) return jsonError(new Error("Track was not found."), 404);
-
-    await db.prepare("UPDATE rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(roomId).run();
+    const result = await updateTrackCategory(roomId, trackId, category as never, sortedBy);
 
     return Response.json({ track: result });
   } catch (error) {
