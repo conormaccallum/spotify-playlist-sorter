@@ -7,7 +7,7 @@ A small live webapp for sorting a Spotify playlist into four buckets:
 - Marginal
 - Gone
 
-The app stores the shared room in D1, so friends who open the same room link see the same sorted state. The UI refreshes every few seconds.
+The app stores the shared room in Supabase Postgres, so friends who open the same room link see the same sorted state. The UI refreshes every few seconds.
 
 ## Run locally
 
@@ -21,8 +21,8 @@ Then open `http://localhost:3000`.
 For shared state, create `.env.local` with:
 
 ```bash
-KV_REST_API_URL=...
-KV_REST_API_TOKEN=...
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
 SPOTIFY_CLIENT_ID=...
 SPOTIFY_CLIENT_SECRET=...
 ```
@@ -38,14 +38,15 @@ npm test
 
 1. Push this repository to GitHub.
 2. In Vercel, choose **Add New → Project** and import the GitHub repo.
-3. In the project’s **Storage** tab, add **Redis**.
-4. Make sure the Redis integration exposes these environment variables to the project:
-   - `KV_REST_API_URL`
-   - `KV_REST_API_TOKEN`
-5. Add the Spotify variables in **Settings → Environment Variables**:
+3. Create a free Supabase project.
+4. In Supabase, open **SQL Editor** and run the contents of `supabase.sql`.
+5. In Vercel, add these Supabase variables in **Settings → Environment Variables**:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+6. Add the Spotify variables in **Settings → Environment Variables**:
    - `SPOTIFY_CLIENT_ID`
    - `SPOTIFY_CLIENT_SECRET`
-6. Deploy with the defaults:
+7. Deploy with the defaults:
    - Framework preset: Next.js
    - Build command: `npm run build`
    - Install command: `npm install`

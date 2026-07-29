@@ -27,58 +27,80 @@ export type StoredTrack = {
   updatedAt: string;
 };
 
+type SupabaseRoomRow = {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+  external_url: string;
+  spotify_playlist_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type SupabaseTrackRow = {
+  id: string;
+  room_id: string;
+  spotify_track_id: string;
+  uri: string;
+  name: string;
+  artists: string;
+  album: string;
+  image_url: string;
+  duration_ms: number;
+  position: number;
+  category: Category | null;
+  sorted_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export const categories = new Set<Category>(["classic", "keep", "marginal", "gone"]);
 
-function redisUrl() {
-  return process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+function supabaseUrl() {
+  return process.env.SUPABASE_URL?.replace(/\/$/, "");
 }
 
-function redisToken() {
-  return process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+function supabaseKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 }
 
-export function hasRedis() {
-  return Boolean(redisUrl() && redisToken());
+export function hasStorage() {
+  return Boolean(supabaseUrl() && supabaseKey());
 }
 
-export function requireRedis() {
-  if (!hasRedis()) {
+function requireStorageConfig() {
+  if (!hasStorage()) {
     throw new Error(
-      "Shared storage is not configured. In Vercel, add a Redis/KV store and expose KV_REST_API_URL and KV_REST_API_TOKEN."
+      "Shared storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel."
     );
   }
 }
 
-async function redisCommand<T>(command: unknown[]) {
-  const url = redisUrl();
-  const token = redisToken();
-  if (!url || !token) {
-    throw new Error(
-      "Shared storage is not configured. In Vercel, add a Redis/KV store and expose KV_REST_API_URL and KV_REST_API_TOKEN."
-    );
-  }
+async function supabaseFetch<T>(path: string, init: RequestInit = {}) {
+  requireStorageConfig();
+  const url = `${supabaseUrl()}/rest/v1/${path}`;
+  const key = supabaseKey()!;
 
   const response = await fetch(url, {
-    method: "POST",
+    ...init,
     headers: {
-      Authorization: `Bearer ${token}`,
+      apikey: key,
+      Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
+      ...(init.headers ?? {}),
     },
-    body: JSON.stringify(command),
     cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error(`Storage request failed with status ${response.status}.`);
+    const detail = await response.text();
+    throw new Error(`Supabase request failed (${response.status}): ${detail || response.statusText}`);
   }
 
-  const data = (await response.json()) as { result?: T; error?: string };
-  if (data.error) throw new Error(data.error);
-  return data.result as T;
+  if (response.status === 204) return null as T;
+  return (await response.json()) as T;
 }
-
-const roomKey = (roomId: string) => `room:${roomId}`;
-const tracksKey = (roomId: string) => `tracks:${roomId}`;
 
 export function slugify(value: string, fallback = "friday-sort") {
   const slug = value
@@ -93,15 +115,81 @@ export function nowIso() {
   return new Date().toISOString();
 }
 
+function roomFromRow(row: SupabaseRoomRow): StoredRoom {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    imageUrl: row.image_url,
+    externalUrl: row.external_url,
+    spotifyPlaylistId: row.spotify_playlist_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function trackFromRow(row: SupabaseTrackRow): StoredTrack {
+  return {
+    id: row.id,
+    spotifyTrackId: row.spotify_track_id,
+    uri: row.uri,
+    name: row.name,
+    artists: row.artists,
+    album: row.album,
+    imageUrl: row.image_url,
+    durationMs: row.duration_ms,
+    position: row.position,
+    category: row.category,
+    sortedBy: row.sorted_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function roomToRow(room: StoredRoom): SupabaseRoomRow {
+  return {
+    id: room.id,
+    name: room.name,
+    description: room.description,
+    image_url: room.imageUrl,
+    external_url: room.externalUrl,
+    spotify_playlist_id: room.spotifyPlaylistId,
+    created_at: room.createdAt,
+    updated_at: room.updatedAt,
+  };
+}
+
+function trackToRow(roomId: string, track: StoredTrack): SupabaseTrackRow {
+  return {
+    id: track.id,
+    room_id: roomId,
+    spotify_track_id: track.spotifyTrackId,
+    uri: track.uri,
+    name: track.name,
+    artists: track.artists,
+    album: track.album,
+    image_url: track.imageUrl,
+    duration_ms: track.durationMs,
+    position: track.position,
+    category: track.category,
+    sorted_by: track.sortedBy,
+    created_at: track.createdAt,
+    updated_at: track.updatedAt,
+  };
+}
+
 export async function getRoom(roomId: string) {
-  const raw = await redisCommand<string | null>(["GET", roomKey(roomId)]);
-  return raw ? (JSON.parse(raw) as StoredRoom) : null;
+  const rows = await supabaseFetch<SupabaseRoomRow[]>(
+    `rooms?id=eq.${encodeURIComponent(roomId)}&limit=1`
+  );
+  return rows[0] ? roomFromRow(rows[0]) : null;
 }
 
 export async function getTracks(roomId: string) {
-  const raw = await redisCommand<string | null>(["GET", tracksKey(roomId)]);
-  const tracks = raw ? (JSON.parse(raw) as StoredTrack[]) : [];
-  return tracks.sort((a, b) => a.position - b.position);
+  const rows = await supabaseFetch<SupabaseTrackRow[]>(
+    `tracks?room_id=eq.${encodeURIComponent(roomId)}&order=position.asc`
+  );
+  return rows.map(trackFromRow);
 }
 
 export async function saveRoomWithTracks(room: StoredRoom, incomingTracks: StoredTrack[]) {
@@ -115,10 +203,17 @@ export async function saveRoomWithTracks(room: StoredRoom, incomingTracks: Store
     updatedAt: existingById.get(track.id)?.updatedAt ?? track.updatedAt,
   }));
 
-  await Promise.all([
-    redisCommand(["SET", roomKey(room.id), JSON.stringify(room)]),
-    redisCommand(["SET", tracksKey(room.id), JSON.stringify(nextTracks)]),
-  ]);
+  await supabaseFetch("rooms?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify(roomToRow(room)),
+  });
+
+  await supabaseFetch("tracks?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
+    body: JSON.stringify(nextTracks.map((track) => trackToRow(room.id, track))),
+  });
 }
 
 export async function updateTrackCategory(
@@ -127,25 +222,28 @@ export async function updateTrackCategory(
   category: Category | null,
   sortedBy: string
 ) {
-  const [room, tracks] = await Promise.all([getRoom(roomId), getTracks(roomId)]);
-  if (!room) throw new Error("Room was not found.");
-
   const timestamp = nowIso();
-  let found = false;
-  const nextTracks = tracks.map((track) => {
-    if (track.id !== trackId) return track;
-    found = true;
-    return { ...track, category, sortedBy, updatedAt: timestamp };
+  const rows = await supabaseFetch<SupabaseTrackRow[]>(
+    `tracks?room_id=eq.${encodeURIComponent(roomId)}&id=eq.${encodeURIComponent(trackId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        category,
+        sorted_by: sortedBy,
+        updated_at: timestamp,
+      }),
+    }
+  );
+
+  if (!rows[0]) throw new Error("Track was not found.");
+
+  await supabaseFetch(`rooms?id=eq.${encodeURIComponent(roomId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ updated_at: timestamp }),
   });
 
-  if (!found) throw new Error("Track was not found.");
-
-  await Promise.all([
-    redisCommand(["SET", tracksKey(roomId), JSON.stringify(nextTracks)]),
-    redisCommand(["SET", roomKey(roomId), JSON.stringify({ ...room, updatedAt: timestamp })]),
-  ]);
-
-  return nextTracks.find((track) => track.id === trackId)!;
+  return trackFromRow(rows[0]);
 }
 
 export function jsonError(error: unknown, status = 500) {

@@ -1,11 +1,11 @@
-import { getRoom, getTracks, hasRedis, jsonError } from "../_lib";
+import { getRoom, getTracks, hasStorage, jsonError } from "../_lib";
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const roomId = url.searchParams.get("room") || "friday-sort";
 
-    if (!hasRedis()) {
+    if (!hasStorage()) {
       return Response.json({
         room: null,
         tracks: [],
