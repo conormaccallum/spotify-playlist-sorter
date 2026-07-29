@@ -42,6 +42,21 @@ function initialRoom() {
   return new URLSearchParams(window.location.search).get("room") || "friday-sort";
 }
 
+function normalizeDuplicatePart(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s*\((remaster(ed)?|mono|stereo|explicit|clean|radio edit).*?\)/gi, "")
+    .replace(/\s*-\s*(remaster(ed)?|mono|stereo|explicit|clean|radio edit).*$/gi, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function duplicateKey(track: Track) {
+  return `${normalizeDuplicatePart(track.name)}::${normalizeDuplicatePart(track.artists)}`;
+}
+
 export default function Home() {
   const [roomId, setRoomId] = useState("friday-sort");
   const [room, setRoom] = useState<Room | null>(null);
@@ -61,6 +76,7 @@ export default function Home() {
     category: Category;
   } | null>(null);
   const [openCategory, setOpenCategory] = useState<Category | null>(null);
+  const [dismissedDuplicateKeys, setDismissedDuplicateKeys] = useState<string[]>([]);
   const lastRoomPayloadRef = useRef("");
 
   useEffect(() => {
@@ -152,6 +168,24 @@ export default function Home() {
     return buckets;
   }, [tracks]);
   const openCategoryTracks = openCategory ? allGrouped[openCategory] : [];
+  const duplicateGroups = useMemo(() => {
+    const buckets = new Map<string, Track[]>();
+    for (const track of tracks) {
+      if (track.category === "gone") continue;
+      const key = duplicateKey(track);
+      if (!key.startsWith("::") && !key.endsWith("::")) {
+        buckets.set(key, [...(buckets.get(key) ?? []), track]);
+      }
+    }
+
+    return [...buckets.entries()]
+      .filter(([key, group]) => group.length > 1 && !dismissedDuplicateKeys.includes(key))
+      .map(([key, group]) => ({
+        key,
+        tracks: group.sort((a, b) => a.position - b.position),
+      }));
+  }, [dismissedDuplicateKeys, tracks]);
+  const activeDuplicateGroup = duplicateGroups[0] ?? null;
   const decisionQueue = grouped.unsorted;
   const currentTrack = decisionQueue[0] ?? null;
   const upcomingTracks = decisionQueue.slice(1, 11);
@@ -170,6 +204,7 @@ export default function Home() {
 
       const nextRoom = data.room.id;
       lastRoomPayloadRef.current = "";
+      setDismissedDuplicateKeys([]);
       setRoomId(nextRoom);
       window.history.replaceState(null, "", `?room=${encodeURIComponent(nextRoom)}`);
       setMessage(`Imported ${data.room.trackCount} tracks. The judging chamber is open.`);
@@ -205,7 +240,7 @@ export default function Home() {
   }
 
   function decideCurrent(category: Category) {
-    if (!currentTrack || flyingDecision) return;
+    if (activeDuplicateGroup || !currentTrack || flyingDecision) return;
     setFlyingDecision({ track: currentTrack, category });
     window.setTimeout(() => {
       setCategory(currentTrack.id, category);
@@ -288,6 +323,10 @@ export default function Home() {
   function moveTrack(trackId: string, value: string) {
     const nextCategory = value === "queue" ? null : (value as Category);
     setCategory(trackId, nextCategory);
+  }
+
+  function dismissDuplicateGroup(key: string) {
+    setDismissedDuplicateKeys((current) => [...current, key]);
   }
 
   const SmallTrackCard = ({ track, index }: { track: Track; index?: number }) => (
@@ -553,7 +592,61 @@ export default function Home() {
           </section>
 
           <section className="decision-stage">
-            {currentTrack ? (
+            {activeDuplicateGroup ? (
+              <article className="duplicate-card">
+                <div className="duplicate-header">
+                  <div>
+                    <p className="eyebrow">Duplicate check</p>
+                    <h3>These look like the same song.</h3>
+                    <p>
+                      Deal with likely duplicates first. Send the spare to Gone, or keep both if
+                      this is a false alarm.
+                    </p>
+                  </div>
+                  <button
+                    className="skip-duplicate"
+                    onClick={() => dismissDuplicateGroup(activeDuplicateGroup.key)}
+                  >
+                    Keep both / skip
+                  </button>
+                </div>
+
+                <div className="duplicate-list">
+                  {activeDuplicateGroup.tracks.map((track) => (
+                    <article className="duplicate-item" key={track.id}>
+                      <div className="decision-art duplicate-art">
+                        {track.imageUrl ? (
+                          <img src={track.imageUrl} alt="" />
+                        ) : (
+                          <span>{track.position + 1}</span>
+                        )}
+                      </div>
+                      <div className="track-main">
+                        <div className="track-title">{track.name}</div>
+                        <div className="track-subtitle">
+                          {track.artists || "Unknown artist"}
+                          {track.album ? ` · ${track.album}` : ""}
+                        </div>
+                        <div className="track-meta">
+                          <span>#{track.position + 1}</span>
+                          {track.category ? (
+                            <span>currently {categoryMeta[track.category].label}</span>
+                          ) : (
+                            <span>currently in queue</span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="duplicate-gone"
+                        onClick={() => setCategory(track.id, "gone")}
+                      >
+                        Move this one to Gone
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </article>
+            ) : currentTrack ? (
               <article
                 className={`decision-card ${
                   flyingDecision?.track.id === currentTrack.id
