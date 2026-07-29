@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 type Category = "classic" | "keep" | "marginal" | "gone";
 type Track = {
@@ -58,6 +58,7 @@ export default function Home() {
     track: Track;
     category: Category;
   } | null>(null);
+  const lastRoomPayloadRef = useRef("");
 
   useEffect(() => {
     setRoomId(initialRoom());
@@ -82,8 +83,13 @@ export default function Home() {
         const response = await fetch(`/api/room?room=${encodeURIComponent(roomId)}`);
         const data = await response.json();
         if (!cancelled) {
-          setRoom(data.room);
-          setTracks(data.tracks ?? []);
+          const nextTracks = data.tracks ?? [];
+          const nextPayload = JSON.stringify({ room: data.room, tracks: nextTracks });
+          if (nextPayload !== lastRoomPayloadRef.current) {
+            lastRoomPayloadRef.current = nextPayload;
+            setRoom(data.room);
+            setTracks(nextTracks);
+          }
         }
       } catch {
         if (!cancelled) setMessage("Could not refresh the room yet.");
@@ -119,7 +125,6 @@ export default function Home() {
   }, [filteredTracks]);
 
   const sortedCount = tracks.filter((track) => track.category).length;
-  const progress = tracks.length ? Math.round((sortedCount / tracks.length) * 100) : 0;
   const categoryCounts = useMemo(
     () =>
       (Object.keys(categoryMeta) as Category[]).reduce(
@@ -148,6 +153,7 @@ export default function Home() {
       if (!response.ok) throw new Error(data.error ?? "Import failed.");
 
       const nextRoom = data.room.id;
+      lastRoomPayloadRef.current = "";
       setRoomId(nextRoom);
       window.history.replaceState(null, "", `?room=${encodeURIComponent(nextRoom)}`);
       setMessage(`Imported ${data.room.trackCount} tracks. The judging chamber is open.`);
@@ -222,72 +228,106 @@ export default function Home() {
 
   return (
     <main>
-      <section className="hero">
+      <section className={`hero ${room ? "compact-hero" : ""}`}>
         <div>
           <p className="eyebrow">Group playlist triage</p>
           <h1>Sort the playlist without losing the room.</h1>
-          <p className="lede">
-            Import a Spotify playlist, share the link, and sort every song into Classic, Keep,
-            Marginal, or Gone. Everyone watching gets updates every few seconds.
-          </p>
+          {!room ? (
+            <p className="lede">
+              Import a Spotify playlist, share the link, and sort every song into Classic, Keep,
+              Marginal, or Gone. Everyone watching gets updates every few seconds.
+            </p>
+          ) : null}
         </div>
-        <div className="hero-card">
-          <span className="big-number">{progress}%</span>
-          <span>sorted</span>
-          <div className="meter" aria-label={`${progress}% sorted`}>
-            <div style={{ width: `${progress}%` }} />
+        {!room ? (
+          <div className="hero-card">
+            <span className="hero-card-label">Ready</span>
+            <p>Load the playlist, then the sorting room takes over.</p>
           </div>
-          <p>{tracks.length ? `${tracks.length} tracks loaded` : "No playlist loaded yet"}</p>
-        </div>
+        ) : null}
       </section>
 
-      <section className="setup-panel">
-        <div className="input-grid">
-          <label>
-            Your name
-            <input
-              value={sorterName}
-              onChange={(event) => setSorterName(event.target.value)}
-              placeholder="Conor, Sarah, The Committee..."
-            />
-          </label>
-          <label>
-            Spotify playlist URL
-            <input
-              value={playlistUrl}
-              onChange={(event) => setPlaylistUrl(event.target.value)}
-              placeholder="https://open.spotify.com/playlist/..."
-            />
-          </label>
-          <button className="primary" onClick={importPlaylist} disabled={isImporting}>
-            {isImporting ? "Importing..." : "Import playlist"}
-          </button>
-        </div>
-        <div className="connect-row">
-          <a href="/api/spotify/login">Connect Spotify</a>
-          <span>Needed for collaborative, private, or owned playlist track imports.</span>
-        </div>
-
-        <details>
-          <summary>No Spotify credentials yet? Paste one song per line instead.</summary>
-          <div className="manual-grid">
+      {room ? (
+        <details className="setup-panel compact-setup">
+          <summary>Import / Spotify controls</summary>
+          <div className="setup-content">
+            <div className="input-grid">
+              <label>
+                Your name
+                <input
+                  value={sorterName}
+                  onChange={(event) => setSorterName(event.target.value)}
+                  placeholder="Conor, Sarah, The Committee..."
+                />
+              </label>
+              <label>
+                Spotify playlist URL
+                <input
+                  value={playlistUrl}
+                  onChange={(event) => setPlaylistUrl(event.target.value)}
+                  placeholder="https://open.spotify.com/playlist/..."
+                />
+              </label>
+              <button className="primary" onClick={importPlaylist} disabled={isImporting}>
+                {isImporting ? "Importing..." : "Import playlist"}
+              </button>
+            </div>
+            <div className="connect-row">
+              <a href="/api/spotify/login">Connect Spotify</a>
+              <span>Needed for collaborative, private, or owned playlist imports.</span>
+            </div>
+          </div>
+          {message ? <p className="notice">{message}</p> : null}
+        </details>
+      ) : (
+        <section className="setup-panel">
+          <div className="input-grid">
             <label>
-              Room name
-              <input value={roomName} onChange={(event) => setRoomName(event.target.value)} />
-            </label>
-            <label>
-              Tracks
-              <textarea
-                value={manualTracks}
-                onChange={(event) => setManualTracks(event.target.value)}
-                placeholder={"Artist - Song title\nAnother Artist - Another Song"}
+              Your name
+              <input
+                value={sorterName}
+                onChange={(event) => setSorterName(event.target.value)}
+                placeholder="Conor, Sarah, The Committee..."
               />
             </label>
+            <label>
+              Spotify playlist URL
+              <input
+                value={playlistUrl}
+                onChange={(event) => setPlaylistUrl(event.target.value)}
+                placeholder="https://open.spotify.com/playlist/..."
+              />
+            </label>
+            <button className="primary" onClick={importPlaylist} disabled={isImporting}>
+              {isImporting ? "Importing..." : "Import playlist"}
+            </button>
           </div>
-        </details>
+          <div className="connect-row">
+            <a href="/api/spotify/login">Connect Spotify</a>
+            <span>Needed for collaborative, private, or owned playlist track imports.</span>
+          </div>
 
-        {message ? <p className="notice">{message}</p> : null}
-      </section>
+          <details>
+            <summary>No Spotify credentials yet? Paste one song per line instead.</summary>
+            <div className="manual-grid">
+              <label>
+                Room name
+                <input value={roomName} onChange={(event) => setRoomName(event.target.value)} />
+              </label>
+              <label>
+                Tracks
+                <textarea
+                  value={manualTracks}
+                  onChange={(event) => setManualTracks(event.target.value)}
+                  placeholder={"Artist - Song title\nAnother Artist - Another Song"}
+                />
+              </label>
+            </div>
+          </details>
+
+          {message ? <p className="notice">{message}</p> : null}
+        </section>
+      )}
 
       {room ? (
         <section className="room-shell">
