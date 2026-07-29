@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 
 type Category = "classic" | "keep" | "marginal" | "gone";
 type Track = {
@@ -54,6 +54,10 @@ export default function Home() {
   const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [flyingDecision, setFlyingDecision] = useState<{
+    track: Track;
+    category: Category;
+  } | null>(null);
 
   useEffect(() => {
     setRoomId(initialRoom());
@@ -116,6 +120,20 @@ export default function Home() {
 
   const sortedCount = tracks.filter((track) => track.category).length;
   const progress = tracks.length ? Math.round((sortedCount / tracks.length) * 100) : 0;
+  const categoryCounts = useMemo(
+    () =>
+      (Object.keys(categoryMeta) as Category[]).reduce(
+        (memo, category) => ({
+          ...memo,
+          [category]: tracks.filter((track) => track.category === category).length,
+        }),
+        {} as Record<Category, number>
+      ),
+    [tracks]
+  );
+  const decisionQueue = grouped.unsorted;
+  const currentTrack = decisionQueue[0] ?? null;
+  const upcomingTracks = decisionQueue.slice(1, 11);
 
   async function importPlaylist() {
     setIsImporting(true);
@@ -164,14 +182,26 @@ export default function Home() {
     }
   }
 
+  function decideCurrent(category: Category) {
+    if (!currentTrack || flyingDecision) return;
+    setFlyingDecision({ track: currentTrack, category });
+    window.setTimeout(() => {
+      setCategory(currentTrack.id, category);
+      setFlyingDecision(null);
+    }, 620);
+  }
+
   async function copyShareLink() {
     await navigator.clipboard.writeText(window.location.href);
     setIsCopied(true);
     window.setTimeout(() => setIsCopied(false), 1300);
   }
 
-  const TrackCard = ({ track }: { track: Track }) => (
-    <article className="track-card">
+  const SmallTrackCard = ({ track, index }: { track: Track; index?: number }) => (
+    <article
+      className="queue-card"
+      style={{ "--queue-index": index ?? 0 } as CSSProperties}
+    >
       <div className="art">
         {track.imageUrl ? <img src={track.imageUrl} alt="" /> : <span>{track.position + 1}</span>}
       </div>
@@ -186,19 +216,6 @@ export default function Home() {
           {formatDuration(track.durationMs) ? <span>{formatDuration(track.durationMs)}</span> : null}
           {track.sortedBy ? <span>last moved by {track.sortedBy}</span> : null}
         </div>
-      </div>
-      <div className="track-actions" aria-label={`Sort ${track.name}`}>
-        {(Object.keys(categoryMeta) as Category[]).map((category) => (
-          <button
-            className={track.category === category ? `active ${category}` : ""}
-            key={category}
-            onClick={() => setCategory(track.id, category)}
-          >
-            {categoryMeta[category].emoji}
-            <span>{categoryMeta[category].label}</span>
-          </button>
-        ))}
-        {track.category ? <button onClick={() => setCategory(track.id, null)}>Undo</button> : null}
       </div>
     </article>
   );
@@ -299,40 +316,94 @@ export default function Home() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search songs, artists, albums..."
             />
-            <span>{grouped.unsorted.length} left to sort</span>
+            <span>
+              {decisionQueue.length} left to sort · {sortedCount}/{tracks.length} decided
+            </span>
           </div>
 
-          <section className="unsorted">
-            <div className="section-heading">
-              <h3>Unsorted</h3>
-              <span>{grouped.unsorted.length}</span>
-            </div>
-            <div className="track-list">
-              {grouped.unsorted.slice(0, 60).map((track) => (
-                <TrackCard key={track.id} track={track} />
-              ))}
-            </div>
-          </section>
-
-          <section className="boards">
+          <section className="category-scoreboard" aria-label="Sorted category totals">
             {(Object.keys(categoryMeta) as Category[]).map((category) => (
-              <div className={`board ${category}`} key={category}>
-                <div className="section-heading">
-                  <div>
-                    <h3>
-                      {categoryMeta[category].emoji} {categoryMeta[category].label}
-                    </h3>
-                    <p>{categoryMeta[category].hint}</p>
-                  </div>
-                  <span>{grouped[category].length}</span>
+              <div
+                className={`category-box ${category} ${
+                  flyingDecision?.category === category ? "receiving" : ""
+                }`}
+                key={category}
+              >
+                <div>
+                  <span className="category-emoji">{categoryMeta[category].emoji}</span>
+                  <h3>{categoryMeta[category].label}</h3>
+                  <p>{categoryMeta[category].hint}</p>
                 </div>
-                <div className="mini-list">
-                  {grouped[category].map((track) => (
-                    <TrackCard key={track.id} track={track} />
-                  ))}
-                </div>
+                <strong>{categoryCounts[category]}</strong>
               </div>
             ))}
+          </section>
+
+          <section className="decision-stage">
+            {currentTrack ? (
+              <article
+                className={`decision-card ${
+                  flyingDecision?.track.id === currentTrack.id
+                    ? `fly-${flyingDecision.category}`
+                    : ""
+                }`}
+              >
+                <div className="decision-art">
+                  {currentTrack.imageUrl ? (
+                    <img src={currentTrack.imageUrl} alt="" />
+                  ) : (
+                    <span>{currentTrack.position + 1}</span>
+                  )}
+                </div>
+                <div className="decision-copy">
+                  <p className="eyebrow">Now deciding</p>
+                  <h3>{currentTrack.name}</h3>
+                  <p>
+                    {currentTrack.artists || "Unknown artist"}
+                    {currentTrack.album ? ` · ${currentTrack.album}` : ""}
+                  </p>
+                  <div className="track-meta">
+                    <span>#{currentTrack.position + 1}</span>
+                    {formatDuration(currentTrack.durationMs) ? (
+                      <span>{formatDuration(currentTrack.durationMs)}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="decision-actions" aria-label={`Sort ${currentTrack.name}`}>
+                  {(Object.keys(categoryMeta) as Category[]).map((category) => (
+                    <button
+                      className={category}
+                      key={category}
+                      onClick={() => decideCurrent(category)}
+                      disabled={Boolean(flyingDecision)}
+                    >
+                      <span>{categoryMeta[category].emoji}</span>
+                      {categoryMeta[category].label}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ) : (
+              <div className="decision-complete">
+                <h3>All songs have faced the panel.</h3>
+                <p>The playlist has survived democracy. Mostly.</p>
+              </div>
+            )}
+          </section>
+
+          <section className="queue-stage">
+            <div className="section-heading">
+              <div>
+                <h3>Coming up next</h3>
+                <p>The next 10 songs float up as you decide.</p>
+              </div>
+              <span>{upcomingTracks.length}</span>
+            </div>
+            <div className="queue-stack">
+              {upcomingTracks.map((track, index) => (
+                <SmallTrackCard key={track.id} track={track} index={index} />
+              ))}
+            </div>
           </section>
         </section>
       ) : (
