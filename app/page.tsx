@@ -58,6 +58,7 @@ export default function Home() {
     track: Track;
     category: Category;
   } | null>(null);
+  const [openCategory, setOpenCategory] = useState<Category | null>(null);
   const lastRoomPayloadRef = useRef("");
 
   useEffect(() => {
@@ -136,6 +137,19 @@ export default function Home() {
       ),
     [tracks]
   );
+  const allGrouped = useMemo(() => {
+    const buckets: Record<Category, Track[]> = {
+      classic: [],
+      keep: [],
+      marginal: [],
+      gone: [],
+    };
+    for (const track of tracks) {
+      if (track.category) buckets[track.category].push(track);
+    }
+    return buckets;
+  }, [tracks]);
+  const openCategoryTracks = openCategory ? allGrouped[openCategory] : [];
   const decisionQueue = grouped.unsorted;
   const currentTrack = decisionQueue[0] ?? null;
   const upcomingTracks = decisionQueue.slice(1, 11);
@@ -201,6 +215,11 @@ export default function Home() {
     await navigator.clipboard.writeText(window.location.href);
     setIsCopied(true);
     window.setTimeout(() => setIsCopied(false), 1300);
+  }
+
+  function moveTrack(trackId: string, value: string) {
+    const nextCategory = value === "queue" ? null : (value as Category);
+    setCategory(trackId, nextCategory);
   }
 
   const SmallTrackCard = ({ track, index }: { track: Track; index?: number }) => (
@@ -363,11 +382,14 @@ export default function Home() {
 
           <section className="category-scoreboard" aria-label="Sorted category totals">
             {(Object.keys(categoryMeta) as Category[]).map((category) => (
-              <div
+              <button
+                type="button"
                 className={`category-box ${category} ${
                   flyingDecision?.category === category ? "receiving" : ""
                 }`}
                 key={category}
+                onClick={() => setOpenCategory(category)}
+                aria-label={`Open ${categoryMeta[category].label} category with ${categoryCounts[category]} songs`}
               >
                 <div>
                   <span className="category-emoji">{categoryMeta[category].emoji}</span>
@@ -375,7 +397,7 @@ export default function Home() {
                   <p>{categoryMeta[category].hint}</p>
                 </div>
                 <strong>{categoryCounts[category]}</strong>
-              </div>
+              </button>
             ))}
           </section>
 
@@ -445,6 +467,81 @@ export default function Home() {
               ))}
             </div>
           </section>
+
+          {openCategory ? (
+            <div
+              className="category-modal-backdrop"
+              role="presentation"
+              onClick={() => setOpenCategory(null)}
+            >
+              <section
+                className={`category-modal ${openCategory}`}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="category-modal-title"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="modal-header">
+                  <div>
+                    <p className="eyebrow">Sorted songs</p>
+                    <h2 id="category-modal-title">
+                      {categoryMeta[openCategory].emoji} {categoryMeta[openCategory].label}
+                    </h2>
+                    <p>{openCategoryTracks.length} songs currently in this bucket.</p>
+                  </div>
+                  <button className="modal-close" onClick={() => setOpenCategory(null)}>
+                    Close
+                  </button>
+                </div>
+
+                <div className="modal-track-list">
+                  {openCategoryTracks.length ? (
+                    openCategoryTracks.map((track) => (
+                      <article className="modal-track" key={track.id}>
+                        <div className="art">
+                          {track.imageUrl ? (
+                            <img src={track.imageUrl} alt="" />
+                          ) : (
+                            <span>{track.position + 1}</span>
+                          )}
+                        </div>
+                        <div className="track-main">
+                          <div className="track-title">{track.name}</div>
+                          <div className="track-subtitle">
+                            {track.artists || "Unknown artist"}
+                            {track.album ? ` · ${track.album}` : ""}
+                          </div>
+                          <div className="track-meta">
+                            <span>#{track.position + 1}</span>
+                            {track.sortedBy ? <span>moved by {track.sortedBy}</span> : null}
+                          </div>
+                        </div>
+                        <label className="move-label">
+                          Move to
+                          <select
+                            value={track.category ?? "queue"}
+                            onChange={(event) => moveTrack(track.id, event.target.value)}
+                          >
+                            <option value="queue">Back to queue</option>
+                            {(Object.keys(categoryMeta) as Category[]).map((category) => (
+                              <option value={category} key={category}>
+                                {categoryMeta[category].label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="modal-empty">
+                      <h3>No songs here yet.</h3>
+                      <p>Give it a minute. Democracy is messy.</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="empty-state">

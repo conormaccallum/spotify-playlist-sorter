@@ -206,6 +206,15 @@ textarea {
   resize: vertical;
 }
 
+select {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(7, 5, 18, 0.78);
+  color: var(--foreground);
+  outline: none;
+  padding: 11px 12px;
+}
+
 input:focus,
 textarea:focus {
   border-color: var(--green);
@@ -346,6 +355,7 @@ summary {
 .category-box {
   position: relative;
   display: flex;
+  width: 100%;
   min-height: 150px;
   justify-content: space-between;
   gap: 16px;
@@ -356,10 +366,18 @@ summary {
     rgba(255, 255, 255, 0.06);
   overflow: hidden;
   padding: 18px;
+  color: var(--foreground);
+  text-align: left;
   transition:
     transform 220ms ease,
     box-shadow 220ms ease,
     border-color 220ms ease;
+}
+
+.category-box:hover,
+.category-box:focus-visible {
+  border-color: rgba(255, 255, 255, 0.36);
+  transform: translateY(-3px);
 }
 
 .category-box::after {
@@ -616,6 +634,120 @@ summary {
     transform 220ms ease;
 }
 
+.category-modal-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 3, 13, 0.72);
+  padding: 22px;
+  backdrop-filter: blur(10px);
+}
+
+.category-modal {
+  width: min(920px, 100%);
+  max-height: min(760px, calc(100vh - 44px));
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.1), transparent 20rem),
+    linear-gradient(145deg, rgba(33, 24, 60, 0.98), rgba(12, 16, 37, 0.98));
+  box-shadow: 0 38px 120px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.category-modal.classic {
+  box-shadow:
+    0 38px 120px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(65, 230, 139, 0.2);
+}
+
+.category-modal.keep {
+  box-shadow:
+    0 38px 120px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 224, 102, 0.18);
+}
+
+.category-modal.marginal {
+  box-shadow:
+    0 38px 120px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 157, 102, 0.2);
+}
+
+.category-modal.gone {
+  box-shadow:
+    0 38px 120px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 111, 177, 0.18);
+}
+
+.modal-header {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  padding: 22px;
+}
+
+.modal-header h2 {
+  margin-bottom: 6px;
+}
+
+.modal-header p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+}
+
+.modal-close {
+  min-height: 40px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--foreground);
+  font-weight: 800;
+  padding: 0 14px;
+}
+
+.modal-track-list {
+  display: grid;
+  gap: 10px;
+  max-height: 560px;
+  overflow: auto;
+  padding: 16px;
+}
+
+.modal-track {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) minmax(150px, 190px);
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(9, 6, 22, 0.5);
+  padding: 10px;
+}
+
+.move-label {
+  gap: 6px;
+  font-size: 0.74rem;
+}
+
+.move-label select {
+  width: 100%;
+}
+
+.modal-empty {
+  border: 1px dashed var(--line);
+  border-radius: 22px;
+  padding: 34px;
+  text-align: center;
+}
+
+.modal-empty p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .art {
   display: grid;
   width: 58px;
@@ -764,6 +896,18 @@ summary {
   .toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .modal-track {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .modal-track .move-label {
+    grid-column: 1 / -1;
+  }
+
+  .category-modal-backdrop {
+    padding: 10px;
   }
 
   @keyframes flyClassic {
