@@ -251,6 +251,41 @@ export async function updateTrackCategory(
   return trackFromRow(rows[0]);
 }
 
+export async function reorderTracks(roomId: string, orderedTrackIds: string[]) {
+  const [room, tracks] = await Promise.all([getRoom(roomId), getTracks(roomId)]);
+  if (!room) throw new Error("Room was not found.");
+  if (orderedTrackIds.length !== tracks.length) {
+    throw new Error("Shuffle request did not include every track.");
+  }
+
+  const trackById = new Map(tracks.map((track) => [track.id, track]));
+  const uniqueIds = new Set(orderedTrackIds);
+  if (uniqueIds.size !== tracks.length || orderedTrackIds.some((id) => !trackById.has(id))) {
+    throw new Error("Shuffle request had unknown or duplicate tracks.");
+  }
+
+  const timestamp = nowIso();
+  const reordered = orderedTrackIds.map((id, position) => ({
+    ...trackById.get(id)!,
+    position,
+    updatedAt: timestamp,
+  }));
+
+  await supabaseFetch("tracks?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(reordered.map((track) => trackToRow(roomId, track))),
+  });
+
+  await supabaseFetch(`rooms?id=eq.${encodeURIComponent(roomId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ updated_at: timestamp }),
+  });
+
+  return reordered;
+}
+
 export function jsonError(error: unknown, status = 500) {
   const message = error instanceof Error ? error.message : "Something went wrong.";
   return Response.json({ error: message }, { status });

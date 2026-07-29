@@ -325,6 +325,32 @@ summary {
   max-width: 520px;
 }
 
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.toolbar-actions button {
+  min-height: 42px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--foreground);
+  font-weight: 850;
+  padding: 0 14px;
+}
+
+.toolbar-actions button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.toolbar-actions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 .toolbar span,
 .section-heading span {
   color: var(--muted);
@@ -894,6 +920,11 @@ summary {
 
   .share-row,
   .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar-actions {
     align-items: stretch;
     flex-direction: column;
   }

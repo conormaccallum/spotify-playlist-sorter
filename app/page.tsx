@@ -54,6 +54,7 @@ export default function Home() {
   const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [isShuffling, setIsShuffling] = useState(false);
   const [flyingDecision, setFlyingDecision] = useState<{
     track: Track;
     category: Category;
@@ -217,6 +218,41 @@ export default function Home() {
     window.setTimeout(() => setIsCopied(false), 1300);
   }
 
+  async function shuffleQueue() {
+    if (tracks.length < 2 || isShuffling) return;
+    setIsShuffling(true);
+    setMessage("");
+
+    const previous = tracks;
+    const shuffled = [...tracks];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+    }
+
+    const repositioned = shuffled.map((track, position) => ({ ...track, position }));
+    setTracks(repositioned);
+
+    try {
+      const response = await fetch("/api/tracks/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId,
+          orderedTrackIds: repositioned.map((track) => track.id),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not shuffle the queue.");
+      setMessage("Queue shuffled. The council has been thrown into productive disarray.");
+    } catch (error) {
+      setTracks(previous);
+      setMessage(error instanceof Error ? error.message : "Could not shuffle the queue.");
+    } finally {
+      setIsShuffling(false);
+    }
+  }
+
   function moveTrack(trackId: string, value: string) {
     const nextCategory = value === "queue" ? null : (value as Category);
     setCategory(trackId, nextCategory);
@@ -375,9 +411,14 @@ export default function Home() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search songs, artists, albums..."
             />
-            <span>
-              {decisionQueue.length} left to sort · {sortedCount}/{tracks.length} decided
-            </span>
+            <div className="toolbar-actions">
+              <button onClick={shuffleQueue} disabled={isShuffling || tracks.length < 2}>
+                {isShuffling ? "Shuffling..." : "Shuffle queue"}
+              </button>
+              <span>
+                {decisionQueue.length} left to sort · {sortedCount}/{tracks.length} decided
+              </span>
+            </div>
           </div>
 
           <section className="category-scoreboard" aria-label="Sorted category totals">
