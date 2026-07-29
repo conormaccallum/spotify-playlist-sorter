@@ -591,126 +591,145 @@ export default function Home() {
             ))}
           </section>
 
-          <section className="decision-stage">
-            {activeDuplicateGroup ? (
-              <article className="duplicate-card">
-                <div className="duplicate-header">
-                  <div>
-                    <p className="eyebrow">Duplicate check</p>
-                    <h3>These look like the same song.</h3>
-                    <p>
-                      Deal with likely duplicates first. Send the spare to Gone, or keep both if
-                      this is a false alarm.
-                    </p>
-                  </div>
-                  <button
-                    className="skip-duplicate"
-                    onClick={() => dismissDuplicateGroup(activeDuplicateGroup.key)}
-                  >
-                    Keep both / skip
-                  </button>
-                </div>
-
-                <div className="duplicate-list">
-                  {activeDuplicateGroup.tracks.map((track) => (
-                    <article className="duplicate-item" key={track.id}>
-                      <div className="decision-art duplicate-art">
-                        {track.imageUrl ? (
-                          <img src={track.imageUrl} alt="" />
-                        ) : (
-                          <span>{track.position + 1}</span>
-                        )}
-                      </div>
-                      <div className="track-main">
-                        <div className="track-title">{track.name}</div>
-                        <div className="track-subtitle">
-                          {track.artists || "Unknown artist"}
-                          {track.album ? ` · ${track.album}` : ""}
-                        </div>
-                        <div className="track-meta">
-                          <span>#{track.position + 1}</span>
-                          {track.category ? (
-                            <span>currently {categoryMeta[track.category].label}</span>
-                          ) : (
-                            <span>currently in queue</span>
-                          )}
-                        </div>
+          <div className="sorting-layout">
+            <div className="sorting-main">
+              <section className="decision-stage">
+                {activeDuplicateGroup ? (
+                  <article className="duplicate-card">
+                    <div className="duplicate-header">
+                      <div>
+                        <p className="eyebrow">Duplicate check</p>
+                        <h3>These look like the same song.</h3>
+                        <p>
+                          Deal with likely duplicates first. Send the spare to Gone, or keep both if
+                          this is a false alarm.
+                        </p>
                       </div>
                       <button
-                        className="duplicate-gone"
-                        onClick={() => setCategory(track.id, "gone")}
+                        className="skip-duplicate"
+                        onClick={() => dismissDuplicateGroup(activeDuplicateGroup.key)}
                       >
-                        Move this one to Gone
+                        Keep both / skip
                       </button>
-                    </article>
-                  ))}
-                </div>
-              </article>
-            ) : currentTrack ? (
-              <article
-                className={`decision-card ${
-                  flyingDecision?.track.id === currentTrack.id
-                    ? `fly-${flyingDecision.category}`
-                    : ""
-                }`}
-              >
-                <div className="decision-art">
-                  {currentTrack.imageUrl ? (
-                    <img src={currentTrack.imageUrl} alt="" />
-                  ) : (
-                    <span>{currentTrack.position + 1}</span>
-                  )}
-                </div>
-                <div className="decision-copy">
-                  <p className="eyebrow">Now deciding</p>
-                  <h3>{currentTrack.name}</h3>
-                  <p>
-                    {currentTrack.artists || "Unknown artist"}
-                    {currentTrack.album ? ` · ${currentTrack.album}` : ""}
-                  </p>
-                  <div className="track-meta">
-                    <span>#{currentTrack.position + 1}</span>
-                    {formatDuration(currentTrack.durationMs) ? (
-                      <span>{formatDuration(currentTrack.durationMs)}</span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="decision-actions" aria-label={`Sort ${currentTrack.name}`}>
-                  {(Object.keys(categoryMeta) as Category[]).map((category) => (
-                    <button
-                      className={category}
-                      key={category}
-                      onClick={() => decideCurrent(category)}
-                      disabled={Boolean(flyingDecision)}
-                    >
-                      <span>{categoryMeta[category].emoji}</span>
-                      {categoryMeta[category].label}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ) : (
-              <div className="decision-complete">
-                <h3>All songs have faced the panel.</h3>
-                <p>The playlist has survived democracy. Mostly.</p>
-              </div>
-            )}
-          </section>
+                    </div>
 
-          <section className="queue-stage">
-            <div className="section-heading">
-              <div>
-                <h3>Coming up next</h3>
-                <p>The next 10 songs float up as you decide.</p>
-              </div>
-              <span>{upcomingTracks.length}</span>
+                    <div className="duplicate-list">
+                      {activeDuplicateGroup.tracks.map((track) => (
+                        <article className="duplicate-item" key={track.id}>
+                          <div className="decision-art duplicate-art">
+                            {track.imageUrl ? (
+                              <img src={track.imageUrl} alt="" />
+                            ) : (
+                              <span>{track.position + 1}</span>
+                            )}
+                          </div>
+                          <div className="track-main">
+                            <div className="track-title">{track.name}</div>
+                            <div className="track-subtitle">
+                              {track.artists || "Unknown artist"}
+                              {track.album ? ` · ${track.album}` : ""}
+                            </div>
+                            <div className="track-meta">
+                              <span>#{track.position + 1}</span>
+                              {track.category ? (
+                                <span>currently {categoryMeta[track.category].label}</span>
+                              ) : (
+                                <span>currently in queue</span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            className="duplicate-gone"
+                            onClick={() => setCategory(track.id, "gone")}
+                          >
+                            Move this one to Gone
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  </article>
+                ) : currentTrack ? (
+                  <article
+                    className={`decision-card ${
+                      flyingDecision?.track.id === currentTrack.id
+                        ? `fly-${flyingDecision.category}`
+                        : ""
+                    }`}
+                  >
+                    <div className="decision-art">
+                      {currentTrack.imageUrl ? (
+                        <img src={currentTrack.imageUrl} alt="" />
+                      ) : (
+                        <span>{currentTrack.position + 1}</span>
+                      )}
+                    </div>
+                    <div className="decision-copy">
+                      <p className="eyebrow">Now deciding</p>
+                      <h3>{currentTrack.name}</h3>
+                      <p>
+                        {currentTrack.artists || "Unknown artist"}
+                        {currentTrack.album ? ` · ${currentTrack.album}` : ""}
+                      </p>
+                      <div className="track-meta">
+                        <span>#{currentTrack.position + 1}</span>
+                        {formatDuration(currentTrack.durationMs) ? (
+                          <span>{formatDuration(currentTrack.durationMs)}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="decision-actions" aria-label={`Sort ${currentTrack.name}`}>
+                      {(Object.keys(categoryMeta) as Category[]).map((category) => (
+                        <button
+                          className={category}
+                          key={category}
+                          onClick={() => decideCurrent(category)}
+                          disabled={Boolean(flyingDecision)}
+                        >
+                          <span>{categoryMeta[category].emoji}</span>
+                          {categoryMeta[category].label}
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                ) : (
+                  <div className="decision-complete">
+                    <h3>All songs have faced the panel.</h3>
+                    <p>The playlist has survived democracy. Mostly.</p>
+                  </div>
+                )}
+              </section>
+
+              <section className="queue-stage">
+                <div className="section-heading">
+                  <div>
+                    <h3>Coming up next</h3>
+                    <p>The next 10 songs float up as you decide.</p>
+                  </div>
+                  <span>{upcomingTracks.length}</span>
+                </div>
+                <div className="queue-stack">
+                  {upcomingTracks.map((track, index) => (
+                    <SmallTrackCard key={track.id} track={track} index={index} />
+                  ))}
+                </div>
+              </section>
             </div>
-            <div className="queue-stack">
-              {upcomingTracks.map((track, index) => (
-                <SmallTrackCard key={track.id} track={track} index={index} />
-              ))}
-            </div>
-          </section>
+
+            <aside className="duplicate-status-card" aria-label="Duplicate check status">
+              <p className="eyebrow">Duplicate scan</p>
+              <strong>{duplicateGroups.length}</strong>
+              <h3>
+                {duplicateGroups.length === 1
+                  ? "potential duplicate identified"
+                  : "potential duplicates identified"}
+              </h3>
+              <p>
+                {duplicateGroups.length
+                  ? "Duplicate candidates are shown before the main sorting queue."
+                  : "The check has run. No likely duplicates are waiting."}
+              </p>
+            </aside>
+          </div>
 
         </section>
       ) : (
