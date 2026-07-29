@@ -32,6 +32,33 @@ type SpotifyTracksPage = {
   next?: string | null;
 };
 
+async function spotifyError(response: Response, fallback: string) {
+  let detail = "";
+  try {
+    const payload = (await response.json()) as {
+      error?: { message?: string; status?: number } | string;
+    };
+    detail =
+      typeof payload.error === "string"
+        ? payload.error
+        : payload.error?.message ?? "";
+  } catch {
+    detail = await response.text().catch(() => "");
+  }
+
+  if (response.status === 401) {
+    return "Spotify rejected the API token. Check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel.";
+  }
+
+  if (response.status === 403 || response.status === 404) {
+    return `${fallback} Spotify returned ${response.status}${
+      detail ? `: ${detail}` : ""
+    }. If this is a private or collaborative playlist, make it public temporarily or use the paste-track-list fallback.`;
+  }
+
+  return `${fallback} Spotify returned ${response.status}${detail ? `: ${detail}` : ""}.`;
+}
+
 async function getSpotifyToken() {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -62,25 +89,40 @@ async function fetchSpotifyPlaylist(playlistInput: string) {
   if (!playlistId) throw new Error("That does not look like a Spotify playlist URL, URI, or ID.");
 
   const token = await getSpotifyToken();
-  const playlistResponse = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}?fields=id,name,description,external_urls.spotify,images`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  const playlistUrl = new URL(`https://api.spotify.com/v1/playlists/${playlistId}`);
+  playlistUrl.searchParams.set("fields", "id,name,description,external_urls.spotify,images");
+
+  const playlistResponse = await fetch(playlistUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
   if (!playlistResponse.ok) {
-    throw new Error("Spotify could not load that playlist. Make sure it is public or accessible to the API app.");
+    throw new Error(
+      await spotifyError(
+        playlistResponse,
+        "Spotify could not load that playlist."
+      )
+    );
   }
 
   const playlist = (await playlistResponse.json()) as SpotifyPlaylistMeta;
 
-  let next: string | null =
-    `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=items(track(id,uri,name,duration_ms,artists(name),album(name,images))),next`;
+  const firstTracksUrl = new URL(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`);
+  firstTracksUrl.searchParams.set("limit", "100");
+  firstTracksUrl.searchParams.set(
+    "fields",
+    "items(track(id,uri,name,duration_ms,artists(name),album(name,images))),next"
+  );
+
+  let next: string | null = firstTracksUrl.toString();
   const items: { track: SpotifyTrack | null }[] = [];
 
   while (next) {
     const pageResponse = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
     if (!pageResponse.ok) {
-      throw new Error("Spotify could not load tracks from that playlist.");
+      throw new Error(
+        await spotifyError(pageResponse, "Spotify could not load tracks from that playlist.")
+      );
     }
     const page = (await pageResponse.json()) as SpotifyTracksPage;
     items.push(...(page.items ?? []));
