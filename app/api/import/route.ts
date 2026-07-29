@@ -19,6 +19,19 @@ type SpotifyTrack = {
   artists?: { name: string }[];
 };
 
+type SpotifyPlaylistMeta = {
+  id: string;
+  name?: string;
+  description?: string;
+  external_urls?: { spotify?: string };
+  images?: { url: string; width: number; height: number }[];
+};
+
+type SpotifyTracksPage = {
+  items?: { track: SpotifyTrack | null }[];
+  next?: string | null;
+};
+
 async function getSpotifyToken() {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -50,7 +63,7 @@ async function fetchSpotifyPlaylist(playlistInput: string) {
 
   const token = await getSpotifyToken();
   const playlistResponse = await fetch(
-    `https://api.spotify.com/v1/playlists/${playlistId}?fields=id,name,description,external_urls.spotify,images,total,tracks.items(track(id,uri,name,duration_ms,artists(name),album(name,images))),tracks.next`,
+    `https://api.spotify.com/v1/playlists/${playlistId}?fields=id,name,description,external_urls.spotify,images`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
 
@@ -58,30 +71,20 @@ async function fetchSpotifyPlaylist(playlistInput: string) {
     throw new Error("Spotify could not load that playlist. Make sure it is public or accessible to the API app.");
   }
 
-  const playlist = (await playlistResponse.json()) as {
-    id: string;
-    name: string;
-    description?: string;
-    external_urls?: { spotify?: string };
-    images?: { url: string; width: number; height: number }[];
-    tracks: {
-      items: { track: SpotifyTrack | null }[];
-      next: string | null;
-    };
-  };
+  const playlist = (await playlistResponse.json()) as SpotifyPlaylistMeta;
 
-  let next = playlist.tracks.next;
-  const items = [...playlist.tracks.items];
+  let next: string | null =
+    `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=items(track(id,uri,name,duration_ms,artists(name),album(name,images))),next`;
+  const items: { track: SpotifyTrack | null }[] = [];
 
   while (next) {
     const pageResponse = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
-    if (!pageResponse.ok) break;
-    const page = (await pageResponse.json()) as {
-      items: { track: SpotifyTrack | null }[];
-      next: string | null;
-    };
-    items.push(...page.items);
-    next = page.next;
+    if (!pageResponse.ok) {
+      throw new Error("Spotify could not load tracks from that playlist.");
+    }
+    const page = (await pageResponse.json()) as SpotifyTracksPage;
+    items.push(...(page.items ?? []));
+    next = page.next ?? null;
   }
 
   return {
