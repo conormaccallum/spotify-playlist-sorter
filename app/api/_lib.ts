@@ -99,7 +99,11 @@ async function supabaseFetch<T>(path: string, init: RequestInit = {}) {
   }
 
   if (response.status === 204) return null as T;
-  return (await response.json()) as T;
+
+  const text = await response.text();
+  if (!text.trim()) return null as T;
+
+  return JSON.parse(text) as T;
 }
 
 export function slugify(value: string, fallback = "friday-sort") {
@@ -205,13 +209,13 @@ export async function saveRoomWithTracks(room: StoredRoom, incomingTracks: Store
 
   await supabaseFetch("rooms?on_conflict=id", {
     method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates" },
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(roomToRow(room)),
   });
 
   await supabaseFetch("tracks?on_conflict=id", {
     method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates" },
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(nextTracks.map((track) => trackToRow(room.id, track))),
   });
 }
@@ -240,6 +244,7 @@ export async function updateTrackCategory(
 
   await supabaseFetch(`rooms?id=eq.${encodeURIComponent(roomId)}`, {
     method: "PATCH",
+    headers: { Prefer: "return=minimal" },
     body: JSON.stringify({ updated_at: timestamp }),
   });
 
