@@ -604,8 +604,10 @@ summary {
   padding: 12px;
 }
 
-.duplicate-art {
+.duplicate-item .duplicate-art {
   width: 96px;
+  height: 96px;
+  aspect-ratio: 1;
   border-radius: 18px;
   font-size: 2rem;
 }
@@ -1068,8 +1070,9 @@ summary {
     grid-template-columns: 72px minmax(0, 1fr);
   }
 
-  .duplicate-art {
+  .duplicate-item .duplicate-art {
     width: 72px;
+    height: 72px;
   }
 
   .duplicate-gone {
