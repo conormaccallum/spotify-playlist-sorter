@@ -6,6 +6,7 @@ import {
   slugify,
   type StoredTrack,
 } from "../_lib";
+import { cookies } from "next/headers";
 
 type SpotifyTrack = {
   id: string;
@@ -28,7 +29,7 @@ type SpotifyPlaylistMeta = {
 };
 
 type SpotifyTracksPage = {
-  items?: { track: SpotifyTrack | null }[];
+  items?: { item?: SpotifyTrack | null; track?: SpotifyTrack | null }[];
   next?: string | null;
 };
 
@@ -47,19 +48,23 @@ async function spotifyError(response: Response, fallback: string) {
   }
 
   if (response.status === 401) {
-    return "Spotify rejected the API token. Check SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in Vercel.";
+    return "Spotify rejected the API token. Click Connect Spotify, then try importing again.";
   }
 
   if (response.status === 403 || response.status === 404) {
     return `${fallback} Spotify returned ${response.status}${
       detail ? `: ${detail}` : ""
-    }. If this is a private or collaborative playlist, make it public temporarily or use the paste-track-list fallback.`;
+    }. Click Connect Spotify, then try importing again. Collaborative or owned playlist tracks require Spotify login.`;
   }
 
   return `${fallback} Spotify returned ${response.status}${detail ? `: ${detail}` : ""}.`;
 }
 
 async function getSpotifyToken() {
+  const cookieStore = await cookies();
+  const userToken = cookieStore.get("spotify_access_token")?.value;
+  if (userToken) return userToken;
+
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
@@ -107,15 +112,15 @@ async function fetchSpotifyPlaylist(playlistInput: string) {
 
   const playlist = (await playlistResponse.json()) as SpotifyPlaylistMeta;
 
-  const firstTracksUrl = new URL(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`);
+  const firstTracksUrl = new URL(`https://api.spotify.com/v1/playlists/${playlistId}/items`);
   firstTracksUrl.searchParams.set("limit", "100");
   firstTracksUrl.searchParams.set(
     "fields",
-    "items(track(id,uri,name,duration_ms,artists(name),album(name,images))),next"
+    "items(item(id,uri,name,duration_ms,artists(name),album(name,images)),track(id,uri,name,duration_ms,artists(name),album(name,images))),next"
   );
 
   let next: string | null = firstTracksUrl.toString();
-  const items: { track: SpotifyTrack | null }[] = [];
+  const items: { item?: SpotifyTrack | null; track?: SpotifyTrack | null }[] = [];
 
   while (next) {
     const pageResponse = await fetch(next, { headers: { Authorization: `Bearer ${token}` } });
@@ -136,7 +141,7 @@ async function fetchSpotifyPlaylist(playlistInput: string) {
     imageUrl: playlist.images?.[0]?.url ?? "",
     externalUrl: playlist.external_urls?.spotify ?? "",
     tracks: items
-      .map((item, index) => ({ track: item.track, index }))
+      .map((item, index) => ({ track: item.item ?? item.track ?? null, index }))
       .filter((item): item is { track: SpotifyTrack; index: number } => Boolean(item.track?.name))
       .map(({ track, index }) => ({
         id: track.id || `${playlist.id}-${index}`,

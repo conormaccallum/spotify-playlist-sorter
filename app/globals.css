@@ -200,6 +200,28 @@ details {
   margin-top: 16px;
 }
 
+.connect-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.connect-row a {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(65, 230, 139, 0.16);
+  color: var(--green);
+  font-weight: 850;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
 summary {
   color: var(--muted);
   cursor: pointer;

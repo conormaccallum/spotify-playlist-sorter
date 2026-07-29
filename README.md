@@ -25,6 +25,7 @@ SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 SPOTIFY_CLIENT_ID=...
 SPOTIFY_CLIENT_SECRET=...
+SPOTIFY_REDIRECT_URI=http://localhost:3000/callback
 ```
 
 ## Verify
@@ -46,6 +47,7 @@ npm test
 6. Add the Spotify variables in **Settings → Environment Variables**:
    - `SPOTIFY_CLIENT_ID`
    - `SPOTIFY_CLIENT_SECRET`
+   - `SPOTIFY_REDIRECT_URI` (set to `https://your-vercel-domain.vercel.app/callback`)
 7. Deploy with the defaults:
    - Framework preset: Next.js
    - Build command: `npm run build`
@@ -59,7 +61,13 @@ Spotify’s API requires app credentials to read playlist tracks. Set these runt
 ```bash
 SPOTIFY_CLIENT_ID=...
 SPOTIFY_CLIENT_SECRET=...
+SPOTIFY_REDIRECT_URI=...
 ```
+
+In the Spotify Developer Dashboard, add the same callback URL to **Redirect URIs**.
+For example: `https://your-vercel-domain.vercel.app/callback`.
+
+Click **Connect Spotify** in the app before importing collaborative, private, or owned playlists.
 
 If credentials are not configured yet, the app still works with the fallback importer: paste one song per line in the form `Artist - Song title`.
 

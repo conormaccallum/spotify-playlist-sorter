@@ -58,6 +58,12 @@ export default function Home() {
   useEffect(() => {
     setRoomId(initialRoom());
     setSorterName(localStorage.getItem("playlist-sorter-name") ?? "");
+    const spotifyStatus = new URLSearchParams(window.location.search).get("spotify");
+    if (spotifyStatus === "connected") {
+      setMessage("Spotify connected. Try importing the playlist again.");
+    } else if (spotifyStatus) {
+      setMessage(`Spotify connection issue: ${spotifyStatus.replaceAll("_", " ")}`);
+    }
   }, []);
 
   useEffect(() => {
@@ -239,6 +245,10 @@ export default function Home() {
           <button className="primary" onClick={importPlaylist} disabled={isImporting}>
             {isImporting ? "Importing..." : "Import playlist"}
           </button>
+        </div>
+        <div className="connect-row">
+          <a href="/api/spotify/login">Connect Spotify</a>
+          <span>Needed for collaborative, private, or owned playlist track imports.</span>
         </div>
 
         <details>
