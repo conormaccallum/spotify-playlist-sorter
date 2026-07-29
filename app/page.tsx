@@ -42,19 +42,27 @@ function initialRoom() {
   return new URLSearchParams(window.location.search).get("room") || "friday-sort";
 }
 
-function normalizeDuplicatePart(value: string) {
+function normalizeDuplicateTitle(value: string) {
   return value
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s*\((remaster(ed)?|mono|stereo|explicit|clean|radio edit).*?\)/gi, "")
-    .replace(/\s*-\s*(remaster(ed)?|mono|stereo|explicit|clean|radio edit).*$/gi, "")
+    .replace(/[([{]\s*(feat\.?|ft\.?|featuring|with)\s+.*?[)\]}]/gi, "")
+    .replace(/\s+(feat\.?|ft\.?|featuring)\s+.*$/gi, "")
+    .replace(
+      /\s*[([{]\s*(live|acoustic|remaster(ed)?|mono|stereo|explicit|clean|radio edit|single edit|extended|extended mix|original mix|club mix|remix|mix|edit|demo|version|session|alternate take|bonus track).*?[)\]}]/gi,
+      ""
+    )
+    .replace(
+      /\s*[-–—]\s*(live|acoustic|remaster(ed)?|mono|stereo|explicit|clean|radio edit|single edit|extended|extended mix|original mix|club mix|remix|mix|edit|demo|version|session|alternate take|bonus track).*$/gi,
+      ""
+    )
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
 
 function duplicateKey(track: Track) {
-  return `${normalizeDuplicatePart(track.name)}::${normalizeDuplicatePart(track.artists)}`;
+  return normalizeDuplicateTitle(track.name);
 }
 
 export default function Home() {
@@ -173,7 +181,7 @@ export default function Home() {
     for (const track of tracks) {
       if (track.category === "gone") continue;
       const key = duplicateKey(track);
-      if (!key.startsWith("::") && !key.endsWith("::")) {
+      if (key) {
         buckets.set(key, [...(buckets.get(key) ?? []), track]);
       }
     }
