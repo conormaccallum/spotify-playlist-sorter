@@ -15,6 +15,7 @@ test("playlist sorter source replaces the starter shell", async () => {
   assert.match(page, /marginal/);
   assert.match(page, /api\/tracks\/category/);
   assert.match(page, /api\/tracks\/reorder/);
+  assert.match(page, /api\/tracks\/reset/);
   assert.doesNotMatch(page + layout + packageJson, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
@@ -25,4 +26,5 @@ test("build output includes the app routes", async () => {
   assert.match(manifest, /api\/room/);
   assert.match(manifest, /api\/tracks\/category/);
   assert.match(manifest, /api\/tracks\/reorder/);
+  assert.match(manifest, /api\/tracks\/reset/);
 });

@@ -346,6 +346,15 @@ summary {
   background: rgba(255, 255, 255, 0.18);
 }
 
+.toolbar-actions .danger-action {
+  background: rgba(255, 111, 177, 0.14);
+  color: #ffd4e8;
+}
+
+.toolbar-actions .danger-action:hover:not(:disabled) {
+  background: rgba(255, 111, 177, 0.24);
+}
+
 .toolbar-actions button:disabled {
   cursor: wait;
   opacity: 0.58;

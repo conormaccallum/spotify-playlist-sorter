@@ -55,6 +55,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [isCopied, setIsCopied] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [flyingDecision, setFlyingDecision] = useState<{
     track: Track;
     category: Category;
@@ -253,6 +254,37 @@ export default function Home() {
     }
   }
 
+  async function resetQueue() {
+    if (!tracks.some((track) => track.category) || isResetting) return;
+    const confirmed = window.confirm(
+      "Reset all sorting progress? This will move every song back into the queue."
+    );
+    if (!confirmed) return;
+
+    setIsResetting(true);
+    setMessage("");
+    const previous = tracks;
+    const resetTracks = tracks.map((track) => ({ ...track, category: null, sortedBy: "" }));
+    setTracks(resetTracks);
+    setOpenCategory(null);
+
+    try {
+      const response = await fetch("/api/tracks/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Could not reset the queue.");
+      setMessage("All songs are back in the queue. Fresh chaos, clean slate.");
+    } catch (error) {
+      setTracks(previous);
+      setMessage(error instanceof Error ? error.message : "Could not reset the queue.");
+    } finally {
+      setIsResetting(false);
+    }
+  }
+
   function moveTrack(trackId: string, value: string) {
     const nextCategory = value === "queue" ? null : (value as Category);
     setCategory(trackId, nextCategory);
@@ -414,6 +446,13 @@ export default function Home() {
             <div className="toolbar-actions">
               <button onClick={shuffleQueue} disabled={isShuffling || tracks.length < 2}>
                 {isShuffling ? "Shuffling..." : "Shuffle queue"}
+              </button>
+              <button
+                className="danger-action"
+                onClick={resetQueue}
+                disabled={isResetting || !tracks.some((track) => track.category)}
+              >
+                {isResetting ? "Resetting..." : "Reset sorting"}
               </button>
               <span>
                 {decisionQueue.length} left to sort · {sortedCount}/{tracks.length} decided

@@ -286,6 +286,33 @@ export async function reorderTracks(roomId: string, orderedTrackIds: string[]) {
   return reordered;
 }
 
+export async function resetTrackCategories(roomId: string) {
+  const [room, tracks] = await Promise.all([getRoom(roomId), getTracks(roomId)]);
+  if (!room) throw new Error("Room was not found.");
+
+  const timestamp = nowIso();
+  const resetTracks = tracks.map((track) => ({
+    ...track,
+    category: null,
+    sortedBy: "",
+    updatedAt: timestamp,
+  }));
+
+  await supabaseFetch("tracks?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(resetTracks.map((track) => trackToRow(roomId, track))),
+  });
+
+  await supabaseFetch(`rooms?id=eq.${encodeURIComponent(roomId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ updated_at: timestamp }),
+  });
+
+  return resetTracks;
+}
+
 export function jsonError(error: unknown, status = 500) {
   const message = error instanceof Error ? error.message : "Something went wrong.";
   return Response.json({ error: message }, { status });
